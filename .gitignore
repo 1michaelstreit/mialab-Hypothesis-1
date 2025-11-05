@@ -236,3 +236,14 @@ xcuserdata/
 ### Project specific stuff
 *.nii.gz
 *.mha
+
+# ignore data
+atlas/
+test/
+train/
+
+# ignore results
+mia-result/
+
+# other
+.vscode
