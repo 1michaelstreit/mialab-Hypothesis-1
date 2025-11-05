@@ -9,6 +9,7 @@ import warnings
 # import pydensecrf.utils as crf_util
 import pymia.filtering.filter as pymia_fltr
 import SimpleITK as sitk
+import numpy as np
 
 
 class ImagePostProcessing(pymia_fltr.Filter):
@@ -30,9 +31,45 @@ class ImagePostProcessing(pymia_fltr.Filter):
         """
 
         # todo: replace this filter by a post-processing - or do we need post-processing at all?
-        warnings.warn('No post-processing implemented. Can you think about something?')
+        #warnings.warn('No post-processing implemented. Can you think about something?')
 
-        return image
+        # Convert the image to a NumPy array for processing
+        img_array = sitk.GetArrayFromImage(image)
+        
+        # Get the unique labels in the image, excluding the background (label 0)
+        labels = np.unique(img_array)
+        labels = labels[labels != 0]
+        
+        output_array = np.zeros_like(img_array)
+
+        for label in labels:
+            # Create a binary mask for the current label
+            binary_mask = (img_array == label)
+            
+            # Label the connected components in the binary mask
+            label_image = sitk.GetImageFromArray(binary_mask.astype(np.uint8))
+            label_image.CopyInformation(image)
+            
+            cc_filter = sitk.ConnectedComponentImageFilter()
+            labeled_components = cc_filter.Execute(label_image)
+            
+            # Relabel the components to get statistics
+            relabel_filter = sitk.RelabelComponentImageFilter()
+            relabel_filter.SortByObjectSizeOn()
+            relabeled_components = relabel_filter.Execute(labeled_components)
+            
+            # Keep only the largest component (which will have label 1 after relabeling)
+            largest_component_mask = sitk.GetArrayFromImage(relabeled_components) == 1
+            
+            # Add the largest component for the current label to the output array
+            output_array[largest_component_mask] = label
+
+        output_image = sitk.GetImageFromArray(output_array)
+        output_image.CopyInformation(image)
+
+        return output_image
+
+
 
     def __str__(self):
         """Gets a printable string representation.

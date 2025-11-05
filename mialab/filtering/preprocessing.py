@@ -6,6 +6,7 @@ import warnings
 
 import pymia.filtering.filter as pymia_fltr
 import SimpleITK as sitk
+import numpy as np
 
 
 class ImageNormalization(pymia_fltr.Filter):
@@ -25,13 +26,29 @@ class ImageNormalization(pymia_fltr.Filter):
         Returns:
             sitk.Image: The normalized image.
         """
-
         img_arr = sitk.GetArrayFromImage(image)
 
-        # todo: normalize the image using numpy
-        warnings.warn('No normalization implemented. Returning unprocessed image.')
+        # Create a mask for brain tissue (non-zero voxels after skull stripping)
+        brain_mask = img_arr != 0
+        brain_voxels = img_arr[brain_mask]
 
-        img_out = sitk.GetImageFromArray(img_arr)
+        # If there are no brain voxels or they all have the same value, normalization is not possible/needed.
+        if brain_voxels.size == 0:
+            return image
+
+        mean = np.mean(brain_voxels)
+        std = np.std(brain_voxels)
+
+        if std < 1e-6:  # Use a small epsilon for floating point comparison to avoid division by zero
+            return image
+
+        # Normalize the image using numpy. Create a new float array for the result.
+        normalized_arr = np.zeros_like(img_arr, dtype=np.float32)
+
+        # Apply z-score normalization only to the brain voxels
+        normalized_arr[brain_mask] = (brain_voxels - mean) / std
+
+        img_out = sitk.GetImageFromArray(normalized_arr)
         img_out.CopyInformation(image)
 
         return img_out
@@ -73,14 +90,17 @@ class SkullStripping(pymia_fltr.Filter):
             params (SkullStrippingParameters): The parameters with the brain mask.
 
         Returns:
-            sitk.Image: The normalized image.
+            sitk.Image: The skull-stripped image.
         """
-        mask = params.img_mask  # the brain mask
+        mask = params.img_mask
 
-        # todo: remove the skull from the image by using the brain mask
-        warnings.warn('No skull-stripping implemented. Returning unprocessed image.')
+        # Cast the mask to the image's pixel type
+        caster = sitk.CastImageFilter()
+        caster.SetOutputPixelType(image.GetPixelID())
+        mask = caster.Execute(mask)
 
-        return image
+        # Multiply the image with the mask to remove the skull
+        return sitk.Multiply(image, mask)
 
     def __str__(self):
         """Gets a printable string representation.
@@ -125,20 +145,25 @@ class ImageRegistration(pymia_fltr.Filter):
         Returns:
             sitk.Image: The registered image.
         """
-
-        # todo: replace this filter by a registration. Registration can be costly, therefore, we provide you the
-        # transformation, which you only need to apply to the image!
-        warnings.warn('No registration implemented. Returning unregistered image')
-
         atlas = params.atlas
         transform = params.transformation
-        is_ground_truth = params.is_ground_truth  # the ground truth will be handled slightly different
+        is_ground_truth = params.is_ground_truth
 
-        # note: if you are interested in registration, and want to test it, have a look at
-        # pymia.filtering.registration.MultiModalRegistration. Think about the type of registration, i.e.
-        # do you want to register to an atlas or inter-subject? Or just ask us, we can guide you ;-)
+        # Use the ResampleImageFilter to apply the transformation
+        resampler = sitk.ResampleImageFilter()
+        resampler.SetReferenceImage(atlas)  # Set the output space to match the atlas
+        resampler.SetTransform(transform)
 
-        return image
+        # Choose the interpolator based on the image type
+        if is_ground_truth:
+            resampler.SetInterpolator(sitk.sitkNearestNeighbor)
+        else:
+            resampler.SetInterpolator(sitk.sitkLinear)
+
+        resampler.SetDefaultPixelValue(0) # Pixels outside the moving image are set to 0
+
+        return resampler.Execute(image)
+
 
     def __str__(self):
         """Gets a printable string representation.
