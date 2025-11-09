@@ -1,6 +1,7 @@
 """This module contains utility classes and functions."""
 import enum
 import os
+import sys
 import typing as t
 import warnings
 
@@ -185,6 +186,21 @@ def pre_process(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
     transform = sitk.ReadTransform(path_to_transform)
     img = structure.BrainImage(id_, path, img, transform)
 
+    # load reference image
+    script_dir =os.path.dirname(sys.argv[0])
+    reference_image_dir_path = os.path.normpath(os.path.join(script_dir, 'mialab/data/train/100307/'))
+    reference_t1_path = os.path.join(reference_image_dir_path, 'T1native.nii.gz')
+    reference_t2_path = os.path.join(reference_image_dir_path, 'T2native.nii.gz')
+    reference_brain_mask_path = os.path.join(reference_image_dir_path, 'Brainmasknative.nii.gz')
+    reference_transform_path = os.path.join(reference_image_dir_path, 'affine.txt')
+
+    reference_img = structure.BrainImage('Reference',
+                                         reference_image_dir_path,
+                                         {structure.BrainImageTypes.T1w: sitk.ReadImage(reference_t1_path),
+                                          structure.BrainImageTypes.T2w: sitk.ReadImage(reference_t2_path),
+                                          structure.BrainImageTypes.BrainMask: sitk.ReadImage(reference_brain_mask_path)},
+                                          sitk.ReadTransform(reference_transform_path))
+
     # construct pipeline for brain mask registration
     # we need to perform this before the T1w and T2w pipeline because the registered mask is used for skull-stripping
     pipeline_brain_mask = fltr.FilterPipeline()
@@ -197,6 +213,28 @@ def pre_process(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
     img.images[structure.BrainImageTypes.BrainMask] = pipeline_brain_mask.execute(
         img.images[structure.BrainImageTypes.BrainMask])
 
+    # construct pipeline for reference brain mask
+    pipeline_ref_brain_mask = fltr.FilterPipeline()
+    if kwargs.get('registration_pre', False):
+        pipeline_ref_brain_mask.add_filter(fltr_prep.ImageRegistration())
+        pipeline_ref_brain_mask.set_param(fltr_prep.ImageRegistrationParameters(atlas_t1, reference_img.transformation, True),
+                                          len(pipeline_ref_brain_mask.filters) - 1)
+    reference_img.images[structure.BrainImageTypes.BrainMask] = pipeline_ref_brain_mask.execute(
+        reference_img.images[structure.BrainImageTypes.BrainMask])
+   
+    # construct pipeline for reference T1w image 
+    pipeline_t1_ref = fltr.FilterPipeline()
+    if kwargs.get('registration_pre', False):
+        pipeline_t1_ref.add_filter(fltr_prep.ImageRegistration())
+        pipeline_t1_ref.set_param(fltr_prep.ImageRegistrationParameters(atlas_t1, reference_img.transformation),
+                                  len(pipeline_t1_ref.filters) - 1)
+    if kwargs.get('skullstrip_pre', False):
+        pipeline_t1_ref.add_filter(fltr_prep.SkullStripping())
+        pipeline_t1_ref.set_param(fltr_prep.SkullStrippingParameters(reference_img.images[structure.BrainImageTypes.BrainMask]),
+                                  len(pipeline_t1_ref.filters) - 1)
+    reference_img.images[structure.BrainImageTypes.T1w] = pipeline_t1_ref.execute(
+        reference_img.images[structure.BrainImageTypes.T1w])
+
     # construct pipeline for T1w image pre-processing
     pipeline_t1 = fltr.FilterPipeline()
     if kwargs.get('registration_pre', False):
@@ -208,7 +246,25 @@ def pre_process(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
         pipeline_t1.set_param(fltr_prep.SkullStrippingParameters(img.images[structure.BrainImageTypes.BrainMask]),
                               len(pipeline_t1.filters) - 1)
     if kwargs.get('normalization_pre', False):
+        filter_params = fltr_prep.NormalizationParameters(reference_img.images[structure.BrainImageTypes.T1w], img.id_, 'T1w')
         pipeline_t1.add_filter(fltr_prep.ImageNormalization())
+
+        if kwargs.get('z_score',False):
+            pipeline_t1.add_filter(fltr_prep.ZScore())
+            pipeline_t1.set_param(filter_params, len(pipeline_t1.filters) - 1)
+
+        elif kwargs.get('min_max',False):
+            pipeline_t1.add_filter(fltr_prep.MinMax())
+            pipeline_t1.set_param(filter_params, len(pipeline_t1.filters) - 1)
+
+        elif kwargs.get('percentile',False):
+            pipeline_t1.add_filter(fltr_prep.Percentile(lower=2.0, upper=98.0))
+            pipeline_t1.set_param(filter_params, len(pipeline_t1.filters) - 1)
+
+        elif kwargs.get('histogram_matching',False):
+            pipeline_t1.add_filter(fltr_prep.HistogramMatching())
+            pipeline_t1.set_param(filter_params, len(pipeline_t1.filters) - 1)
+        #elif kwargs.get('white_stripe',False):
 
     # execute pipeline on the T1w image
     img.images[structure.BrainImageTypes.T1w] = pipeline_t1.execute(img.images[structure.BrainImageTypes.T1w])

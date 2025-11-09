@@ -5,9 +5,22 @@ Image pre-processing aims to improve the image quality (image intensities) for s
 import warnings
 
 import pymia.filtering.filter as pymia_fltr
+from pymia.filtering.filter import FilterParams
 import SimpleITK as sitk
 import numpy as np
 
+# container of parameter used in image normalization filter
+class NormalizationParameters(pymia_fltr.FilterParams):
+
+    def __init__(self,
+                reference_image: sitk.Image,
+                image_id: str = '',
+                label='',
+                ) -> None:
+        super().__init__()
+        self.reference_image = reference_image
+        self.image_id = image_id
+        self.label = label
 
 class ImageNormalization(pymia_fltr.Filter):
     """Represents a normalization filter."""
@@ -26,6 +39,20 @@ class ImageNormalization(pymia_fltr.Filter):
         Returns:
             sitk.Image: The normalized image.
         """
+        img_arr = sitk.GetArrayFromImage(image)
+        img_out = sitk.GetImageFromArray(img_arr)
+        img_out.CopyInformation(image)
+
+        return img_out
+
+class ZScore(ImageNormalization):
+
+    # run constructors
+    def __init__(self):
+        super().__init__()
+
+    def execute(self, image: sitk.Image, params: FilterParams = None) -> sitk.Image:
+        print('Normalization: Z-Score Method')  
         img_arr = sitk.GetArrayFromImage(image)
 
         # Create a mask for brain tissue (non-zero voxels after skull stripping)
@@ -62,7 +89,78 @@ class ImageNormalization(pymia_fltr.Filter):
         return 'ImageNormalization:\n' \
             .format(self=self)
 
+class MinMax(ImageNormalization):
+    
+    def __init__(self):
+        super().__init__()
 
+    def execute(self, image: sitk.Image, params: FilterParams = None) -> sitk.Image:
+        print('Normalization: Min-Max Method')
+
+        img_arr = sitk.GetArrayFromImage(image).astype(np.float32)
+
+        min_val = np.min(img_arr)
+        max_val = np.max(img_arr)
+
+        if max_val > min_val:
+            img_arr = (img_arr - min_val) / (max_val - min_val)
+        else:
+            img_arr[:] = 0.0
+
+        img_out = sitk.GetImageFromArray(img_arr)
+        img_out.CopyInformation(image)
+
+        return img_out
+    
+class Percentile(ImageNormalization):
+    
+    def __init__(self, lower: float = 2.0, upper: float = 98.0):
+        super().__init__()
+        self.lower = lower
+        self.upper = upper
+
+    def execute(self, image: sitk.Image, params: FilterParams = None) -> sitk.Image:
+        print('Normalization: Percentile Method')
+
+        img_arr = sitk.GetArrayFromImage(image).astype(np.float32)
+
+        p_low = np.percentile(img_arr, self.lower)
+        p_high = np.percentile(img_arr, self.upper)
+
+        img_arr = np.clip(img_arr, p_low, p_high)
+
+        # Normalize to [0, 1]
+        if p_high > p_low:
+            img_arr = (img_arr - p_low) / (p_high - p_low)
+        else:
+            img_arr[:] = 0.0
+
+        img_out = sitk.GetImageFromArray(img_arr)
+        img_out.CopyInformation(image)
+
+        return img_out
+class HistogramMatching(ImageNormalization):
+    
+    def __init__(self, num_histogram_levels: int = 1024, num_match_points: int = 1000, threshold_at_mean_intensity: bool = True):
+        super().__init__()
+        self.num_histogram_levels = num_histogram_levels
+        self.num_match_points = num_match_points
+        self.threshold_at_mean_intensity = threshold_at_mean_intensity
+
+    def execute(self, image: sitk.Image, params: NormalizationParameters = None) -> sitk.Image:
+        print('Normalization: Histogram Matching Method')
+
+        matcher = sitk.HistogramMatchingImageFilter()
+        matcher.SetNumberOfHistogramLevels(self.num_histogram_levels)
+        matcher.SetNumberOfMatchPoints(self.num_match_points)
+        if self.threshold_at_mean_intensity:
+            matcher.ThresholdAtMeanIntensityOn()
+        else:
+            matcher.ThresholdAtMeanIntensityOff()
+            
+        img_out = matcher.Execute(image, params.reference_image)
+
+        return img_out
 class SkullStrippingParameters(pymia_fltr.FilterParams):
     """Skull-stripping parameters."""
 

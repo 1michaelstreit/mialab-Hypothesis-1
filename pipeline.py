@@ -60,6 +60,11 @@ def main(result_dir: str, data_atlas_dir: str, data_train_dir: str, data_test_di
                                           futil.DataDirectoryFilter())
     pre_process_params = {'skullstrip_pre': True,
                           'normalization_pre': True,
+                          'min_max': False,
+                          'z_score': False,
+                          'percentile': False,
+                          'histogram_matching': True,
+                          'white_stripe': False,
                           'registration_pre': True,
                           'coordinates_feature': True,
                           'intensity_feature': True,
