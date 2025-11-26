@@ -201,6 +201,9 @@ def pre_process(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
                                           structure.BrainImageTypes.BrainMask: sitk.ReadImage(reference_brain_mask_path)},
                                           sitk.ReadTransform(reference_transform_path))
 
+    # -------------------------------------------------------------------------
+    # Brain mask
+    # -------------------------------------------------------------------------
     # construct pipeline for brain mask registration
     # we need to perform this before the T1w and T2w pipeline because the registered mask is used for skull-stripping
     pipeline_brain_mask = fltr.FilterPipeline()
@@ -222,6 +225,9 @@ def pre_process(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
     reference_img.images[structure.BrainImageTypes.BrainMask] = pipeline_ref_brain_mask.execute(
         reference_img.images[structure.BrainImageTypes.BrainMask])
    
+    # -------------------------------------------------------------------------
+    # T1w
+    # -------------------------------------------------------------------------
     # construct pipeline for reference T1w image 
     pipeline_t1_ref = fltr.FilterPipeline()
     if kwargs.get('registration_pre', False):
@@ -264,10 +270,26 @@ def pre_process(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
         elif kwargs.get('histogram_matching',False):
             pipeline_t1.add_filter(fltr_prep.HistogramMatching())
             pipeline_t1.set_param(filter_params, len(pipeline_t1.filters) - 1)
-        #elif kwargs.get('white_stripe',False):
 
     # execute pipeline on the T1w image
     img.images[structure.BrainImageTypes.T1w] = pipeline_t1.execute(img.images[structure.BrainImageTypes.T1w])
+
+
+    # -------------------------------------------------------------------------
+    # T2w
+    # -------------------------------------------------------------------------
+    # construct pipeline for reference T2w image 
+    pipeline_t2_ref = fltr.FilterPipeline()
+    if kwargs.get('registration_pre', False):
+        pipeline_t2_ref.add_filter(fltr_prep.ImageRegistration())
+        pipeline_t2_ref.set_param(fltr_prep.ImageRegistrationParameters(atlas_t2, reference_img.transformation),
+                                  len(pipeline_t2_ref.filters) - 1)
+    if kwargs.get('skullstrip_pre', False):
+        pipeline_t2_ref.add_filter(fltr_prep.SkullStripping())
+        pipeline_t2_ref.set_param(fltr_prep.SkullStrippingParameters(reference_img.images[structure.BrainImageTypes.BrainMask]),
+                                  len(pipeline_t2_ref.filters) - 1)
+    reference_img.images[structure.BrainImageTypes.T2w] = pipeline_t2_ref.execute(
+        reference_img.images[structure.BrainImageTypes.T2w])
 
     # construct pipeline for T2w image pre-processing
     pipeline_t2 = fltr.FilterPipeline()
@@ -280,11 +302,31 @@ def pre_process(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
         pipeline_t2.set_param(fltr_prep.SkullStrippingParameters(img.images[structure.BrainImageTypes.BrainMask]),
                               len(pipeline_t2.filters) - 1)
     if kwargs.get('normalization_pre', False):
+        filter_params = fltr_prep.NormalizationParameters(reference_img.images[structure.BrainImageTypes.T2w], img.id_, 'T2w')
         pipeline_t2.add_filter(fltr_prep.ImageNormalization())
+
+        if kwargs.get('z_score',False):
+            pipeline_t2.add_filter(fltr_prep.ZScore())
+            pipeline_t2.set_param(filter_params, len(pipeline_t2.filters) - 1)
+
+        elif kwargs.get('min_max',False):
+            pipeline_t2.add_filter(fltr_prep.MinMax())
+            pipeline_t2.set_param(filter_params, len(pipeline_t2.filters) - 1)
+
+        elif kwargs.get('percentile',False):
+            pipeline_t2.add_filter(fltr_prep.Percentile(lower=2.0, upper=98.0))
+            pipeline_t2.set_param(filter_params, len(pipeline_t2.filters) - 1)
+
+        elif kwargs.get('histogram_matching',False):
+            pipeline_t2.add_filter(fltr_prep.HistogramMatching())
+            pipeline_t2.set_param(filter_params, len(pipeline_t2.filters) - 1)        
 
     # execute pipeline on the T2w image
     img.images[structure.BrainImageTypes.T2w] = pipeline_t2.execute(img.images[structure.BrainImageTypes.T2w])
 
+    # -------------------------------------------------------------------------
+    # Ground Truth
+    # -------------------------------------------------------------------------
     # construct pipeline for ground truth image pre-processing
     pipeline_gt = fltr.FilterPipeline()
     if kwargs.get('registration_pre', False):
