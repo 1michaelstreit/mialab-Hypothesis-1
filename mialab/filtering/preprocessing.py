@@ -51,8 +51,7 @@ class ZScore(ImageNormalization):
     def __init__(self):
         super().__init__()
 
-    def execute(self, image: sitk.Image, params: FilterParams = None) -> sitk.Image:
-        print('Normalization: Z-Score Method')  
+    def execute(self, image: sitk.Image, params: FilterParams = None) -> sitk.Image:  
         img_arr = sitk.GetArrayFromImage(image)
 
         # Create a mask for brain tissue (non-zero voxels after skull stripping)
@@ -95,7 +94,6 @@ class MinMax(ImageNormalization):
         super().__init__()
 
     def execute(self, image: sitk.Image, params: FilterParams = None) -> sitk.Image:
-        print('Normalization: Min-Max Method')
 
         img_arr = sitk.GetArrayFromImage(image).astype(np.float32)
 
@@ -120,7 +118,6 @@ class Percentile(ImageNormalization):
         self.upper = upper
 
     def execute(self, image: sitk.Image, params: FilterParams = None) -> sitk.Image:
-        print('Normalization: Percentile Method')
 
         img_arr = sitk.GetArrayFromImage(image).astype(np.float32)
 
@@ -148,7 +145,6 @@ class HistogramMatching(ImageNormalization):
         self.threshold_at_mean_intensity = threshold_at_mean_intensity
 
     def execute(self, image: sitk.Image, params: NormalizationParameters = None) -> sitk.Image:
-        print('Normalization: Histogram Matching Method')
 
         matcher = sitk.HistogramMatchingImageFilter()
         matcher.SetNumberOfHistogramLevels(self.num_histogram_levels)

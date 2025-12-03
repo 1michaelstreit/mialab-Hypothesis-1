@@ -14,10 +14,12 @@ All forest-related stuff stays in pipeline.py.
 import os
 import datetime
 import timeit
+import random  # Added for data splitting
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
+import matplotlib.pyplot as plt  # Added for plotting
 
 import SimpleITK as sitk
 
@@ -52,15 +54,18 @@ class BrainImageDataset(Dataset):
     and extracting patches for U-Net training.
     """
 
-    def __init__(self, patient_data: dict, patch_size=(96, 96, 96)):
+    def __init__(self, patient_data: dict, patch_size=(96, 96, 96),
+     normalization_method='z_score'):
         # patient_data is crawler.data from FileSystemDataCrawler
         self.patient_data = list(patient_data.items())
         self.patch_size = patch_size
+        self.normalization_method = normalization_method
 
         # atlas images must be loaded via putil.load_atlas_images(...)
         if not hasattr(putil, "atlas_t1") or putil.atlas_t1 is None:
             raise RuntimeError("Atlas images not loaded. Call putil.load_atlas_images(...) first.")
         self.atlas_t1 = putil.atlas_t1
+        self.atlas_t2 = putil.atlas_t2
 
     def __len__(self):
         return len(self.patient_data)
@@ -130,14 +135,29 @@ class BrainImageDataset(Dataset):
 
         # ----- 3) Skull-strip & normalize -----
         skullstrip_params = fltr_prep.SkullStrippingParameters(mask_registered)
+        normalizer = get_normalizer(self.normalization_method)
 
+        # Apply Skull Stripping
         skullstripped_t1 = fltr_prep.SkullStripping().execute(t1w_registered, skullstrip_params)
-        normalized_t1 = fltr_prep.ImageNormalization().execute(skullstripped_t1)
-
         skullstripped_t2 = fltr_prep.SkullStripping().execute(t2w_registered, skullstrip_params)
-        normalized_t2 = fltr_prep.ImageNormalization().execute(skullstripped_t2)
-
         skullstripped_gt = fltr_prep.SkullStripping().execute(gt_registered, skullstrip_params)
+
+        # Prepare parameters for Normalization
+        # ZScore/MinMax/Percentile ignore these params, but HistogramMatching needs them.
+        param_t1 = fltr_prep.NormalizationParameters(self.atlas_t1)
+        param_t2 = fltr_prep.NormalizationParameters(self.atlas_t2)
+
+        # Apply Normalization
+        # Note: We pass param_t1/param_t2. The execute method of ZScore/MinMax ignores it,
+        # but HistogramMatching uses it.
+        if self.normalization_method == 'none':
+            # Skip normalization, just pass the skullstripped images
+            normalized_t1 = skullstripped_t1
+            normalized_t2 = skullstripped_t2
+        else:
+            # Use the normalizer object as before
+            normalized_t1 = normalizer.execute(skullstripped_t1, param_t1)
+            normalized_t2 = normalizer.execute(skullstripped_t2, param_t2)
 
         # ----- 4) Convert to numpy / tensors -----
         t1w_np = sitk.GetArrayFromImage(normalized_t1).astype(np.float32)
@@ -212,7 +232,7 @@ def create_dynunet(in_channels: int = 2, out_channels: int = 6) -> DynUNet:
         kernel_size=[[3, 3, 3]] * 5,
         strides=[1, 2, 2, 2, 2],
         upsample_kernel_size=[2, 2, 2, 2],
-        filters=[32, 64, 128, 256, 512],
+        filters=[16, 32, 64, 128, 256],
         deep_supervision=False,
     )
     return model
@@ -220,21 +240,27 @@ def create_dynunet(in_channels: int = 2, out_channels: int = 6) -> DynUNet:
 
 def train_deep_learning_model(
     train_loader: DataLoader,
+    val_loader: DataLoader,  # Added validation loader
     device: torch.device,
     num_epochs: int = 1,
     in_channels: int = 2,
     out_channels: int = 6,
     lr: float = 1e-3,
     weight_decay: float = 1e-6,
-) -> torch.nn.Module:
+) -> tuple:
     """Train DynUNet on patches from train_loader."""
     model = create_dynunet(in_channels=in_channels, out_channels=out_channels).to(device)
 
     loss_function = DiceCELoss(to_onehot_y=True, softmax=True, lambda_dice=1.0, lambda_ce=1.0)
     optimizer = torch.optim.Adam(model.parameters(), lr=lr, weight_decay=weight_decay)
 
+    # History tracking
+    train_loss_history = []
+    val_loss_history = []
+
     start_time = timeit.default_timer()
     for epoch in range(num_epochs):
+        # --- Training ---
         model.train()
         epoch_loss = 0.0
         step = 0
@@ -242,7 +268,6 @@ def train_deep_learning_model(
         for batch_data in train_loader:
             step += 1
             inputs, labels = batch_data[0].to(device), batch_data[1].to(device)
-
             labels = labels.long().unsqueeze(1)  # shape (B, 1, D, H, W)
 
             optimizer.zero_grad()
@@ -253,10 +278,30 @@ def train_deep_learning_model(
             epoch_loss += loss.item()
 
         epoch_loss /= max(step, 1)
-        print(f"Epoch {epoch + 1}/{num_epochs}, Average Loss: {epoch_loss:.4f}")
+        train_loss_history.append(epoch_loss)
+
+        # --- Validation ---
+        model.eval()
+        epoch_val_loss = 0.0
+        val_step = 0
+        with torch.no_grad():
+            for batch_data in val_loader:
+                val_step += 1
+                inputs, labels = batch_data[0].to(device), batch_data[1].to(device)
+                labels = labels.long().unsqueeze(1)
+
+                outputs = model(inputs)
+                loss = loss_function(outputs, labels)
+                epoch_val_loss += loss.item()
+        
+        epoch_val_loss /= max(val_step, 1)
+        val_loss_history.append(epoch_val_loss)
+
+        print(f"Epoch {epoch + 1}/{num_epochs}, Train Loss: {epoch_loss:.4f}, Val Loss: {epoch_val_loss:.4f}")
 
     print("Training Time elapsed:", timeit.default_timer() - start_time, "s")
-    return model
+    
+    return model, train_loss_history, val_loss_history
 
 
 # -------------------------------------------------------------------------
@@ -293,6 +338,26 @@ def infer_full_volume(
     pred_np = torch.argmax(logits, dim=1).squeeze(0).cpu().numpy().astype(np.uint8)
     return pred_np
 
+class NoNormalization:
+    def execute(self, image, params=None):
+        return image  # <--- You must have this, not 'pass'
+
+
+def get_normalizer(method: str):
+    """Factory to get the normalization filter based on string name."""
+    if method == 'z_score':
+        return fltr_prep.ZScore()
+    elif method == 'min_max':
+        return fltr_prep.MinMax()
+    elif method == 'percentile':
+        return fltr_prep.Percentile()
+    elif method == 'histogram_matching':
+        return
+    elif method == 'histogram_matching':
+        # Default params from your class definition
+        return fltr_prep.HistogramMatching()
+    else:
+        return fltr_prep.ImageNormalization()
 
 # -------------------------------------------------------------------------
 # Full deep pipeline (training + testing)
@@ -307,6 +372,7 @@ def run_deep_learning_pipeline(
     num_epochs: int = 80,
     patch_size=(128, 128, 128),
     batch_size: int = 2,
+    normalization_method: str = 'z_score'
 ) -> None:
     """
     Full deep-learning pipeline:
@@ -331,11 +397,28 @@ def run_deep_learning_pipeline(
     device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
     print(f"Using device: {device}")
 
-    train_dataset = BrainImageDataset(crawler_train.data, patch_size=patch_size)
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    # Split data into train and validation (80/20)
+    data_items = list(crawler_train.data.items())
+    random.seed(42)
+    random.shuffle(data_items)
+    
+    split_index = int(len(data_items) * 0.8)
+    train_data = dict(data_items[:split_index])
+    val_data = dict(data_items[split_index:])
+    
+    print(f"Training samples: {len(train_data)}, Validation samples: {len(val_data)}")
 
-    model = train_deep_learning_model(
+    # Create Datasets and Loaders
+    train_dataset = BrainImageDataset(train_data, patch_size=patch_size, normalization_method=normalization_method)
+    val_dataset = BrainImageDataset(val_data, patch_size=patch_size, normalization_method=normalization_method)
+
+    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True, num_workers=4)
+    # Validation usually doesn't need shuffle, but patches are random, so shuffle helps variety
+    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=True, num_workers=2)
+
+    model, train_losses, val_losses = train_deep_learning_model(
         train_loader=train_loader,
+        val_loader=val_loader,
         device=device,
         num_epochs=num_epochs,
         in_channels=2,
@@ -344,8 +427,22 @@ def run_deep_learning_pipeline(
 
     # timestamped result directory
     t = datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")
-    result_dir = os.path.join(result_dir, t)
+    result_dir = os.path.join(result_dir, t + normalization_method )
     os.makedirs(result_dir, exist_ok=True)
+
+    # Plot Learning Curve
+    plt.figure(figsize=(10, 6))
+    plt.plot(range(1, num_epochs + 1), train_losses, label='Training Loss')
+    plt.plot(range(1, num_epochs + 1), val_losses, label='Validation Loss')
+    plt.xlabel('Epochs')
+    plt.ylabel('Loss')
+    plt.title(f'Learning Curve - Normalization: {normalization_method}')
+    plt.legend()
+    plt.grid(True)
+    plot_path = os.path.join(result_dir, 'learning_curve.png')
+    plt.savefig(plot_path)
+    plt.close()
+    print(f"Learning curve saved to {plot_path}")
 
     # save model
     model_path = os.path.join(result_dir, "model.pth")
@@ -363,10 +460,6 @@ def run_deep_learning_pipeline(
         futil.BrainImageFilePathGenerator(),
         futil.DataDirectoryFilter(),
     )
-
-    if not hasattr(putil, "atlas_t1") or putil.atlas_t1 is None:
-        print("Error: Atlas images not loaded. Aborting deep testing.")
-        return
 
     for sid, original_paths in crawler_test.data.items():
         print("-" * 10, "Testing", sid)
@@ -422,12 +515,25 @@ def run_deep_learning_pipeline(
 
         # D) Skull-strip & normalize
         skullstrip_params = fltr_prep.SkullStrippingParameters(mask_registered)
+        normalizer = get_normalizer(normalization_method)
 
         skullstripped_t1 = fltr_prep.SkullStripping().execute(t1w_registered, skullstrip_params)
-        normalized_t1 = fltr_prep.ImageNormalization().execute(skullstripped_t1)
-
         skullstripped_t2 = fltr_prep.SkullStripping().execute(t2w_registered, skullstrip_params)
-        normalized_t2 = fltr_prep.ImageNormalization().execute(skullstripped_t2)
+
+        # Create params with the Atlas as reference
+
+        if normalization_method == 'none':
+            # Skip normalization
+            normalized_t1 = skullstripped_t1
+            normalized_t2 = skullstripped_t2
+        else:
+            # Normal logic
+            normalizer = get_normalizer(normalization_method)
+            param_t1 = fltr_prep.NormalizationParameters(putil.atlas_t1)
+            param_t2 = fltr_prep.NormalizationParameters(putil.atlas_t2)
+            
+            normalized_t1 = normalizer.execute(skullstripped_t1, param_t1)
+            normalized_t2 = normalizer.execute(skullstripped_t2, param_t2)
 
         # E) Create input tensor
         t1w_np = sitk.GetArrayFromImage(normalized_t1).astype(np.float32)

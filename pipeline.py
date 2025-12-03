@@ -16,7 +16,7 @@ import numpy as np
 import pymia.data.conversion as conversion
 import pymia.evaluation.writer as writer
 
-from deep_learning_model import run_deep_learning_pipeline
+from mialab.filtering.deep_learning_model import run_deep_learning_pipeline
 
 try:
     import mialab.data.structure as structure
@@ -44,6 +44,7 @@ def main(
     data_train_dir: str,
     data_test_dir: str,
     mode: str = "forest",
+    args=None
 ):
     """Brain tissue segmentation using decision forests or deep learning.
 
@@ -71,6 +72,7 @@ def main(
             data_atlas_dir=data_atlas_dir,
             data_train_dir=data_train_dir,
             data_test_dir=data_test_dir,
+            normalization_method=args.norm
         )
         # All training, testing, saving, and evaluation are handled in deep_learning_model.py
         return
@@ -93,11 +95,11 @@ def main(
 
     pre_process_params = {
         "skullstrip_pre": True,
-        "normalization_pre": True,
-        "min_max": False,
-        "z_score": False,
-        "percentile": False,
-        "histogram_matching": True,
+        "normalization_pre": (args.norm != 'none'),
+        "min_max": (args.norm == 'min_max'),
+        "z_score": (args.norm == 'z_score'),
+        "percentile": (args.norm == 'percentile'),
+        "histogram_matching": (args.norm == 'percentile'),
         "white_stripe": False,
         "registration_pre": True,
         "coordinates_feature": True,
@@ -267,6 +269,14 @@ if __name__ == "__main__":
     )
 
     parser.add_argument(
+        '--norm', 
+        type=str, 
+        default='z_score', 
+        choices=['z_score', 'min_max', 'percentile', 'histogram_matching', 'none'],
+        help="Normalization method."
+    )
+
+    parser.add_argument(
         "--mode",
         type=str,
         choices=["forest", "deep"],
@@ -282,4 +292,5 @@ if __name__ == "__main__":
         args.data_train_dir,
         args.data_test_dir,
         args.mode,
+        args,
     )
