@@ -159,7 +159,7 @@ class FeatureExtractor:
         return image.reshape((no_voxels, number_of_components))
 
 
-def pre_process(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
+def pre_process(id_: str, paths: dict, **kwargs) -> t.Tuple[structure.BrainImage,structure.BrainImage]:
     """Loads and processes an image.
 
     The processing includes:
@@ -348,7 +348,7 @@ def pre_process(id_: str, paths: dict, **kwargs) -> structure.BrainImage:
     img.feature_images = {}  # we free up memory because we only need the img.feature_matrix
     # for training of the classifier
 
-    return img
+    return img, reference_img
 
 
 def post_process(img: structure.BrainImage, segmentation: sitk.Image, probability: sitk.Image,
@@ -405,7 +405,7 @@ def init_evaluator() -> eval_.Evaluator:
 
 
 def pre_process_batch(data_batch: t.Dict[structure.BrainImageTypes, structure.BrainImage],
-                      pre_process_params: dict = None, multi_process: bool = True) -> t.List[structure.BrainImage]:
+                      pre_process_params: dict = None, multi_process: bool = True) -> t.Tuple[t.List[structure.BrainImage],t.List[structure.BrainImage]]:
     """Loads and pre-processes a batch of images.
 
     The pre-processing includes:
@@ -427,10 +427,14 @@ def pre_process_batch(data_batch: t.Dict[structure.BrainImageTypes, structure.Br
 
     params_list = list(data_batch.items())
     if multi_process:
-        images = mproc.MultiProcessor.run(pre_process, params_list, pre_process_params, mproc.PreProcessingPickleHelper)
+        results = mproc.MultiProcessor.run(pre_process, params_list, pre_process_params, mproc.PreProcessingPickleHelper)
     else:
-        images = [pre_process(id_, path, **pre_process_params) for id_, path in params_list]
-    return images
+        results = [pre_process(id_, path, **pre_process_params) for id_, path in params_list]
+
+    images = [result[0] for result in results]
+    reference_images = [result[1] for result in results]
+
+    return images, reference_images
 
 
 def post_process_batch(brain_images: t.List[structure.BrainImage], segmentations: t.List[sitk.Image],
