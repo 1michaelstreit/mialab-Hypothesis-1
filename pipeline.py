@@ -95,11 +95,11 @@ def main(
 
     pre_process_params = {
         "skullstrip_pre": True,
-        "normalization_pre": True,
-        "min_max": True,
-        "z_score": False,
-        "percentile": False,
-        "histogram_matching": False,
+        "normalization_pre": (args.norm != 'none'),
+        "min_max": (args.norm == 'min_max'),
+        "z_score": (args.norm == 'z_score'),
+        "percentile": (args.norm == 'percentile'),
+        "histogram_matching": (args.norm == 'percentile'),
         "white_stripe": False,
         "registration_pre": True,
         "coordinates_feature": True,
@@ -108,16 +108,16 @@ def main(
     }
 
     # load images for training and pre-process
-    images_training,_ = putil.pre_process_batch(
+    images = putil.pre_process_batch(
         crawler.data, pre_process_params, multi_process=False
     )
 
     # generate feature matrix and label vector
-    data_train = np.concatenate([img.feature_matrix[0] for img in images_training])
-    labels_train = np.concatenate([img.feature_matrix[1] for img in images_training]).squeeze()
+    data_train = np.concatenate([img.feature_matrix[0] for img in images])
+    labels_train = np.concatenate([img.feature_matrix[1] for img in images]).squeeze()
 
     forest = sk_ensemble.RandomForestClassifier(
-        max_features=images_training[0].feature_matrix[0].shape[1],
+        max_features=images[0].feature_matrix[0].shape[1],
         n_estimators=10,
         max_depth=10,
         random_state=42,
@@ -148,9 +148,28 @@ def main(
 
     # load images for testing and pre-process
     pre_process_params["training"] = False
-    images_test, reference_images = putil.pre_process_batch(
+    images_test = putil.pre_process_batch(
         crawler.data, pre_process_params, multi_process=False
     )
+    
+    if args.prepro_only:
+        print("Saving preprocessed images only (fast mode)")
+
+        for img in images_test:
+            sitk.WriteImage(
+                img.images[structure.BrainImageTypes.T1w],
+                os.path.join(result_dir, img.id_ + "_PrePro_T1w.mha"),
+                True,
+            )
+
+            sitk.WriteImage(
+                img.images[structure.BrainImageTypes.T2w],
+                os.path.join(result_dir, img.id_ + "_PrePro_T2w.mha"),
+                True,
+            )
+
+        print("Done. Exiting early.")
+        return
 
     images_prediction = []
     images_probabilities = []
@@ -199,24 +218,16 @@ def main(
         )
 
         # save results
+
         sitk.WriteImage(
             images_test[i].images[structure.BrainImageTypes.T1w],
-            os.path.join(result_dir, images_test[i].id_ + "_PrePro-T1w.mha"),
+            os.path.join(result_dir, images_test[i].id_ + "_PrePro_T1w.mha"),
             True,
         )
-        sitk.WriteImage(
-            reference_images[i].images[structure.BrainImageTypes.T1w],
-            os.path.join(result_dir, reference_images[i].id_ + "_REF-PrePro-T1w.mha"),
-            True,
-        )
+
         sitk.WriteImage(
             images_test[i].images[structure.BrainImageTypes.T2w],
-            os.path.join(result_dir, images_test[i].id_ + "_PrePro-T2w.mha"),
-            True,
-        )
-        sitk.WriteImage(
-            reference_images[i].images[structure.BrainImageTypes.T2w],
-            os.path.join(result_dir, reference_images[i].id_ + "_REF-PrePro-T2w.mha"),
+            os.path.join(result_dir, images_test[i].id_ + "_PrePro_T2w.mha"),
             True,
         )
 
@@ -227,7 +238,7 @@ def main(
         )
         sitk.WriteImage(
             images_post_processed[i],
-            os.path.join(result_dir, images_test[i].id_ + "_SEG-PostPro.mha"),
+            os.path.join(result_dir, images_test[i].id_ + "_SEG-PP.mha"),
             True,
         )
 
@@ -303,6 +314,12 @@ if __name__ == "__main__":
         choices=["forest", "deep"],
         default="forest",
         help="Choose segmentation method: forest or deep.",
+    )
+
+    parser.add_argument(
+        "--prepro_only",
+        action="store_true",
+        help="Only run preprocessing and save preprocessed images"
     )
 
     args = parser.parse_args()
