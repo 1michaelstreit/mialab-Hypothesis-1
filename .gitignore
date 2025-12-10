@@ -244,6 +244,8 @@ train/
 
 # ignore results
 mia-result/
+experiment_results/
+*.png
 
 # other
 .vscode

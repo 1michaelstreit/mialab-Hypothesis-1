@@ -31,22 +31,17 @@ file_name = "results.csv"
 trials <- data.frame(
   PATH = c(
     "../experiment_results/forest/z_score/2025-12-05-14-38-58",
-    "../experiment_results/forest/percentile/2025-12-05-14-54-34",
-    "../experiment_results/forest/none/2025-12-05-15-10-02",
-    "../experiment_results/forest/histogram_matching/2025-12-05-15-02-22",
-    "../experiment_results/forest/min_max/2025-12-05-14-46-37"
+    "../experiment_results/forest/z_score/2025-12-09-23-38-57",
+    "../experiment_results/forest/z_score/2025-12-10-12-45-29"
   ),
   
-  METHOD = c(
-    "z_score",
-    "percentile",
-    "None",
-    "Histogram_Matching",
-    "min_max"
+  PARAMETER = c(
+    "10/10",
+    "10/90",
+    "50/30"
     ),
   stringsAsFactors = FALSE
 )
-
 
 ################################################################
 
@@ -58,7 +53,7 @@ trials <- data.frame(
 all_data <- data.frame()
 
 for (i in 1:nrow(trials)) {
-  trial <- trials$METHOD[i]
+  trial <- trials$PARAMETER[i]
   csv_path <- file.path(script_dir, trials$PATH[i], file_name)
   
   # Load CSV
@@ -67,26 +62,26 @@ for (i in 1:nrow(trials)) {
   # Keep only labels of interest
   df <- df %>% filter(LABEL %in% c("Amygdala", "GreyMatter", "Hippocampus", "Thalamus", "WhiteMatter"))
   
-  # Add method as a column
-  df$METHOD <- trial
+  # Add paramter as a column
+  df$PARAMETER <- trial
   
   # Append to combined data frame
   all_data <- rbind(all_data, df)
 }
 
-# Ensure LABEL and METHOD are factors for proper ordering
+# Ensure LABEL and PARAMETER are factors for proper ordering
 all_data$LABEL <- factor(all_data$LABEL, levels = c("Amygdala", "GreyMatter", "Hippocampus", "Thalamus", "WhiteMatter"))
-all_data$METHOD <- factor(all_data$METHOD, levels = trials$METHOD)
+all_data$PARAMETER <- factor(all_data$PARAMETER, levels = trials$PARAMETER)
 
 # -------------------------------
-# Boxplot: DICE (all methods)
+# Boxplot: DICE (all paramters)
 # -------------------------------
-plot_dice <- ggplot(all_data, aes(x = LABEL, y = DICE, fill = METHOD)) +
+plot_dice <- ggplot(all_data, aes(x = LABEL, y = DICE, fill = PARAMETER)) +
   geom_boxplot(position = position_dodge(width = 0.8), alpha = 0.7) +
   scale_fill_viridis_d(option = "plasma") +
   scale_color_viridis_d(option = "plasma") +
   labs(
-    title = "DICE Score Comparison Across Normalization Methods",
+    title = "DICE Score Comparison Across Deep Forest Parameter Z-Score",
     x = "Anatomical Label",
     y = "DICE Score (Similarity)"
   ) +
@@ -103,19 +98,19 @@ plot_dice <- ggplot(all_data, aes(x = LABEL, y = DICE, fill = METHOD)) +
 print(plot_dice)
 
 # Save DICE plot
-ggsave(file.path(script_dir, "boxplot_dice_all_methods.png"),
+ggsave(file.path(script_dir, "boxplot_dice_Forest.png"),
        plot = plot_dice, width = 12, height = 6, units = "in", dpi = 300)
-cat("Saved 'boxplot_dice_all_methods.png'\n")
+cat("Saved 'boxplot_dice_Forest.png'\n")
 
 # -------------------------------
-# Boxplot: HDRFDST (all methods)
+# Boxplot: HDRFDST (all paramters)
 # -------------------------------
-plot_hdrfdst <- ggplot(all_data, aes(x = LABEL, y = HDRFDST, fill = METHOD)) +
+plot_hdrfdst <- ggplot(all_data, aes(x = LABEL, y = HDRFDST, fill = PARAMETER)) +
   geom_boxplot(position = position_dodge(width = 0.8), alpha = 0.7, outlier.colour = "red", outlier.shape = 8) +
   scale_fill_viridis_d(option = "plasma") +
   scale_color_viridis_d(option = "plasma") +
   labs(
-    title = "HDRFDST Score Comparison Across Normalization Methods",
+    title = "HDRFDST Score Comparison Across Deep Forest Parameter Z-Score",
     x = "Anatomical Label",
     y = "HDRFDST (Boundary Error)"
   ) +
@@ -131,7 +126,7 @@ plot_hdrfdst <- ggplot(all_data, aes(x = LABEL, y = HDRFDST, fill = METHOD)) +
 print(plot_hdrfdst)
 
 # Save HDRFDST plot
-ggsave(file.path(script_dir, "boxplot_hdrfdst_all_methods.png"),
+ggsave(file.path(script_dir, "boxplot_hdrfdst_Forest.png"),
        plot = plot_hdrfdst, width = 12, height = 6, units = "in", dpi = 300)
-cat("Saved 'boxplot_hdrfdst_all_methods.png'\n")
+cat("Saved 'boxplot_hdrfdst_Forest.png'\n")
 
