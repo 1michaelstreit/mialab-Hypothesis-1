@@ -118,8 +118,8 @@ def main(
 
     forest = sk_ensemble.RandomForestClassifier(
         max_features=images[0].feature_matrix[0].shape[1],
-        n_estimators=10,
-        max_depth=10,
+        n_estimators=100,
+        max_depth=30,
         random_state=42,
         n_jobs=-1,
     )

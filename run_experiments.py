@@ -21,7 +21,8 @@ def run_all_experiments(
     data_train_dir: str,
     data_test_dir: str,
     run_deep: bool = True,
-    run_forest: bool = False
+    run_forest: bool = False,
+    prepro_only: bool = False
 ):
     # 1. Define the Test to iterate over
     normalization_methods = [
@@ -68,6 +69,7 @@ def run_all_experiments(
             args.data_train_dir = data_train_dir
             args.data_test_dir = data_test_dir
             args.mode = mode
+            args.prepro_only = prepro_only
 
             # 5. Execute the pipeline
             start_time = time.time()
@@ -122,6 +124,7 @@ if __name__ == "__main__":
     # Flags to control what to run
     parser.add_argument("--skip_forest", action="store_true", help="Skip Random Forest experiments")
     parser.add_argument("--skip_deep", action="store_true", help="Skip Deep Learning experiments")
+    parser.add_argument("--prepro_only", action="store_true", help="Only run preprocessing and save preprocessed images")
 
     args = parser.parse_args()
 
@@ -131,5 +134,6 @@ if __name__ == "__main__":
         data_train_dir=args.data_train_dir,
         data_test_dir=args.data_test_dir,
         run_deep=not args.skip_deep,
-        run_forest=not args.skip_forest
+        run_forest=not args.skip_forest,
+        prepro_only=args.prepro_only
     )

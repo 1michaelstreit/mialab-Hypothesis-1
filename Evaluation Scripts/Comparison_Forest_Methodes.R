@@ -32,13 +32,15 @@ trials <- data.frame(
   PATH = c(
     "../experiment_results/forest/z_score/2025-12-05-14-38-58",
     "../experiment_results/forest/z_score/2025-12-09-23-38-57",
-    "../experiment_results/forest/z_score/2025-12-10-12-45-29"
+    "../experiment_results/forest/z_score/2025-12-10-12-45-29",
+    "../experiment_results/forest/z_score/2025-12-10-15-41-59"
   ),
   
   PARAMETER = c(
     "10/10",
     "10/90",
-    "50/30"
+    "50/30",
+    "100/30"
     ),
   stringsAsFactors = FALSE
 )
