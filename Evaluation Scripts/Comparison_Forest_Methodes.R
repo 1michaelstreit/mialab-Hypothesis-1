@@ -83,7 +83,7 @@ plot_dice <- ggplot(all_data, aes(x = LABEL, y = DICE, fill = PARAMETER)) +
   scale_fill_viridis_d(option = "plasma") +
   scale_color_viridis_d(option = "plasma") +
   labs(
-    title = "DICE Score Comparison Across Deep Forest Parameter Z-Score",
+    title = "DICE Score Comparison Across Random Forest Parameter Z-Score",
     x = "Anatomical Label",
     y = "DICE Score (Similarity)"
   ) +
