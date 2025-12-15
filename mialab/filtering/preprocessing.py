@@ -132,24 +132,20 @@ class Percentile(ImageNormalization):
 
         img_arr = sitk.GetArrayFromImage(image).astype(np.float32)
 
-        brain_mask = img_arr != 0
-        brain_voxels = img_arr[brain_mask]
+        p_low = np.percentile(img_arr, self.lower)
+        p_high = np.percentile(img_arr, self.upper)
 
-        if brain_voxels.size == 0:
-            return image
+        img_arr = np.clip(img_arr, p_low, p_high)
 
-        p_low = np.percentile(brain_voxels, self.lower)
-        p_high = np.percentile(brain_voxels, self.upper)
-
-        clipped = np.clip(brain_voxels, p_low, p_high)
-
-        normalized_arr = np.zeros_like(img_arr, dtype=np.float32)
-
+        # Normalize to [0, 1]
         if p_high > p_low:
-            normalized_arr[brain_mask] = (clipped - p_low) / (p_high - p_low)
+            img_arr = (img_arr - p_low) / (p_high - p_low)
+        else:
+            img_arr[:] = 0.0
 
-        img_out = sitk.GetImageFromArray(normalized_arr)
+        img_out = sitk.GetImageFromArray(img_arr)
         img_out.CopyInformation(image)
+
         return img_out
 class HistogramMatching(ImageNormalization):
     
@@ -159,11 +155,8 @@ class HistogramMatching(ImageNormalization):
         self.num_match_points = num_match_points
         self.threshold_at_mean_intensity = threshold_at_mean_intensity
 
-def execute(self, image: sitk.Image, params: NormalizationParameters = None) -> sitk.Image:
+    def execute(self, image: sitk.Image, params: NormalizationParameters = None) -> sitk.Image:
         
-        source_mask = sitk.Cast(image != 0, sitk.sitkUInt8)
-        reference_mask = sitk.Cast(params.reference_image != 0, sitk.sitkUInt8)
-
         rescaler = sitk.RescaleIntensityImageFilter()
         rescaler.SetOutputMinimum(0)
         rescaler.SetOutputMaximum(65535)
@@ -184,9 +177,6 @@ def execute(self, image: sitk.Image, params: NormalizationParameters = None) -> 
             matcher.ThresholdAtMeanIntensityOn()
         else:
             matcher.ThresholdAtMeanIntensityOff()
-
-        matcher.SetSourceMask(source_mask)
-        matcher.SetReferenceMask(reference_mask)
             
         img_out = matcher.Execute(casted_image, casted_reference_image)
 
