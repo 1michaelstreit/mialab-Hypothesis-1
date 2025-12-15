@@ -97,18 +97,29 @@ class MinMax(ImageNormalization):
 
         img_arr = sitk.GetArrayFromImage(image).astype(np.float32)
 
-        min_val = np.min(img_arr)
-        max_val = np.max(img_arr)
+        brain_mask = img_arr != 0
+        brain_voxels = img_arr[brain_mask]
+
+        if brain_voxels.size == 0:
+            return image
+
+        min_val = np.min(brain_voxels)
+        max_val = np.max(brain_voxels)
+        
+        normalized_arr = np.zeros_like(img_arr, dtype=np.float32)
 
         if max_val > min_val:
-            img_arr = (img_arr - min_val) / (max_val - min_val)
+            # MinMax formula: (I - min) / (max - min)
+            normalized_arr[brain_mask] = (brain_voxels - min_val) / (max_val - min_val)
         else:
-            img_arr[:] = 0.0
+            # If all brain voxels have the same value, we set them to 0.0 (already done by normalized_arr initialization)
+            pass 
 
-        img_out = sitk.GetImageFromArray(img_arr)
+        img_out = sitk.GetImageFromArray(normalized_arr)
         img_out.CopyInformation(image)
 
         return img_out
+
     
 class Percentile(ImageNormalization):
     
