@@ -99,7 +99,7 @@ def main(
         "min_max": (args.norm == 'min_max'),
         "z_score": (args.norm == 'z_score'),
         "percentile": (args.norm == 'percentile'),
-        "histogram_matching": (args.norm == 'percentile'),
+        "histogram_matching": (args.norm == 'histogram_matching'), 
         "white_stripe": False,
         "registration_pre": True,
         "coordinates_feature": True,
