@@ -145,6 +145,19 @@ class HistogramMatching(ImageNormalization):
         self.threshold_at_mean_intensity = threshold_at_mean_intensity
 
     def execute(self, image: sitk.Image, params: NormalizationParameters = None) -> sitk.Image:
+        
+        rescaler = sitk.RescaleIntensityImageFilter()
+        rescaler.SetOutputMinimum(0)
+        rescaler.SetOutputMaximum(65535)
+
+        caster_to_int = sitk.CastImageFilter()
+        caster_to_int.SetOutputPixelType(sitk.sitkUInt16) 
+
+        scaled_image = rescaler.Execute(image)
+        casted_image = caster_to_int.Execute(scaled_image)
+        
+        scaled_reference_image = rescaler.Execute(params.reference_image)
+        casted_reference_image = caster_to_int.Execute(scaled_reference_image)
 
         matcher = sitk.HistogramMatchingImageFilter()
         matcher.SetNumberOfHistogramLevels(self.num_histogram_levels)
@@ -154,9 +167,14 @@ class HistogramMatching(ImageNormalization):
         else:
             matcher.ThresholdAtMeanIntensityOff()
             
-        img_out = matcher.Execute(image, params.reference_image)
+        img_out = matcher.Execute(casted_image, casted_reference_image)
 
-        return img_out
+        caster_to_float = sitk.CastImageFilter()
+        caster_to_float.SetOutputPixelType(sitk.sitkFloat32)
+        img_out_float = caster_to_float.Execute(img_out)
+        img_out_float.CopyInformation(image) 
+        return img_out_float
+        
 class SkullStrippingParameters(pymia_fltr.FilterParams):
     """Skull-stripping parameters."""
 

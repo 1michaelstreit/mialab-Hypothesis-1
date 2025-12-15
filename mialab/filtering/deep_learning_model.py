@@ -351,12 +351,12 @@ def get_normalizer(method: str):
         return fltr_prep.MinMax()
     elif method == 'percentile':
         return fltr_prep.Percentile()
-    elif method == 'histogram_matching':
-        return
-    elif method == 'histogram_matching':
+    elif method == 'histogram_matching': # FIX: Correctly returns the HistogramMatching instance
         # Default params from your class definition
         return fltr_prep.HistogramMatching()
     else:
+        # Note: 'none' case is handled by the caller in this implementation, 
+        # but if it was passed here, we can return the default.
         return fltr_prep.ImageNormalization()
 
 # -------------------------------------------------------------------------
