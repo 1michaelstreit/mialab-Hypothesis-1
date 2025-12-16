@@ -1,9 +1,9 @@
 # Load necessary libraries
 #install.packages(c("tidyverse", "readr", "ggplot2")) # Uncomment and run if you need to install packages
-#library(tidyverse)
-#library(readr)
-#library(ggplot2)
-#library(rstudioapi)
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(rstudioapi)
 
 
 # Load the Data ---
@@ -85,7 +85,7 @@ plot_dice <- ggplot(all_data, aes(x = LABEL, y = DICE, fill = PARAMETER)) +
   labs(
     title = "DICE Score Comparison Across Random Forest Parameter Z-Score",
     x = "Anatomical Label",
-    y = "DICE Score (Similarity)"
+    y = "DICE Score"
   ) +
   theme_minimal() +
   theme(
@@ -112,9 +112,9 @@ plot_hdrfdst <- ggplot(all_data, aes(x = LABEL, y = HDRFDST, fill = PARAMETER)) 
   scale_fill_viridis_d(option = "plasma") +
   scale_color_viridis_d(option = "plasma") +
   labs(
-    title = "HDRFDST Score Comparison Across Deep Forest Parameter Z-Score",
+    title = "HDRFDST Score Comparison Across Random Forest Parameter Z-Score",
     x = "Anatomical Label",
-    y = "HDRFDST (Boundary Error)"
+    y = "HDRFDST"
   ) +
   theme_bw() +
   theme(

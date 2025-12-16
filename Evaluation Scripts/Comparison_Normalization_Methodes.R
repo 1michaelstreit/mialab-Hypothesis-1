@@ -1,9 +1,9 @@
 # Load necessary libraries
 #install.packages(c("tidyverse", "readr", "ggplot2")) # Uncomment and run if you need to install packages
-#library(tidyverse)
-#library(readr)
-#library(ggplot2)
-#library(rstudioapi)
+library(tidyverse)
+library(readr)
+library(ggplot2)
+library(rstudioapi)
 
 
 # Load the Data ---
@@ -30,11 +30,11 @@ file_name = "results.csv"
 # choose trials to compare
 trials <- data.frame(
   PATH = c(
-    "../experiment_results/forest/z_score/2025-12-05-14-38-58",
-    "../experiment_results/forest/percentile/2025-12-05-14-54-34",
-    "../experiment_results/forest/none/2025-12-05-15-10-02",
-    "../experiment_results/forest/histogram_matching/2025-12-05-15-02-22",
-    "../experiment_results/forest/min_max/2025-12-05-14-46-37"
+    "../experiment_results/forest/z_score/2025-12-16-00-17-06",
+    "../experiment_results/forest/percentile/2025-12-16-00-30-28",
+    "../experiment_results/forest/none/2025-12-16-00-44-22",
+    "../experiment_results/forest/histogram_matching/2025-12-16-00-37-29",
+    "../experiment_results/forest/min_max/2025-12-16-00-23-44"
   ),
   
   METHOD = c(
@@ -88,7 +88,7 @@ plot_dice <- ggplot(all_data, aes(x = LABEL, y = DICE, fill = METHOD)) +
   labs(
     title = "DICE Score Comparison Across Normalization Methods",
     x = "Anatomical Label",
-    y = "DICE Score (Similarity)"
+    y = "DICE Score"
   ) +
   theme_minimal() +
   theme(
@@ -98,7 +98,7 @@ plot_dice <- ggplot(all_data, aes(x = LABEL, y = DICE, fill = METHOD)) +
     legend.position = "right",
     plot.background = element_rect(fill = "white", colour = "white")
   ) +
-  coord_cartesian(ylim = c(0,1))
+  coord_cartesian(ylim = c(0.3,1))
 
 print(plot_dice)
 
@@ -117,7 +117,7 @@ plot_hdrfdst <- ggplot(all_data, aes(x = LABEL, y = HDRFDST, fill = METHOD)) +
   labs(
     title = "HDRFDST Score Comparison Across Normalization Methods",
     x = "Anatomical Label",
-    y = "HDRFDST (Boundary Error)"
+    y = "HDRFDST"
   ) +
   theme_bw() +
   theme(

@@ -210,6 +210,24 @@ def main(
         multi_process=True,
     )
 
+    sitk.WriteImage(
+        images_test[0].images[structure.BrainImageTypes.T1w],
+        os.path.join(result_dir, images_test[0].id_ + "_PrePro_T1w.mha"),
+        True,
+    )
+
+    sitk.WriteImage(
+        images_test[0].images[structure.BrainImageTypes.T2w],
+        os.path.join(result_dir, images_test[0].id_ + "_PrePro_T2w.mha"),
+        True,
+    )
+
+    sitk.WriteImage(
+        images_test[0].images[structure.BrainImageTypes.BrainMask],
+        os.path.join(result_dir, images_test[0].id_ + "_BrainMask.mha"),
+        True,
+    )
+
     for i, img in enumerate(images_test):
         evaluator.evaluate(
             images_post_processed[i],
@@ -219,17 +237,23 @@ def main(
 
         # save results
 
-        sitk.WriteImage(
-            images_test[i].images[structure.BrainImageTypes.T1w],
-            os.path.join(result_dir, images_test[i].id_ + "_PrePro_T1w.mha"),
-            True,
-        )
+        # sitk.WriteImage(
+        #     images_test[i].images[structure.BrainImageTypes.T1w],
+        #     os.path.join(result_dir, images_test[i].id_ + "_PrePro_T1w.mha"),
+        #     True,
+        # )
 
-        sitk.WriteImage(
-            images_test[i].images[structure.BrainImageTypes.T2w],
-            os.path.join(result_dir, images_test[i].id_ + "_PrePro_T2w.mha"),
-            True,
-        )
+        # sitk.WriteImage(
+        #     images_test[i].images[structure.BrainImageTypes.T2w],
+        #     os.path.join(result_dir, images_test[i].id_ + "_PrePro_T2w.mha"),
+        #     True,
+        # )
+
+        # sitk.WriteImage(
+        #     images_test[i].images[structure.BrainImageTypes.BrainMask],
+        #     os.path.join(result_dir, images_test[i].id_ + "_BrainMask.mha"),
+        #     True,
+        # )
 
         sitk.WriteImage(
             images_prediction[i],
