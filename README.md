@@ -29,12 +29,6 @@ Install the required Python packages:
 pip install numpy SimpleITK scikit-learn torch monai matplotlib pymia
 ```
 
-**Note: The project relies on pymia for data handling and evaluation.
-Data Structure
-The pipeline expects a specific directory structure. By default, it looks for a mialab folder relative to the script location, but paths can be customized via arguments.**
-
-
-
 ```
 /path/to/project/
 ├── mialab/
@@ -64,13 +58,47 @@ The pipeline expects a specific directory structure. By default, it looks for a 
 
 Trains a 3D DynUNet on image patches and performs sliding-window inference on test images.
 
+**code**
+
+```
 python pipeline.py --mode deep --result_dir ./results_dl --norm z_score
+```
+
 
 ### 3. Preprocessing Only
 
+
+**code**
+
+```
 python pipeline.py --prepro_only --result_dir ./debug_prepro
+```
+
 
 **Runs the preprocessing steps (registration, skull stripping, normalization) and saves the intermediate images without training a model. This is useful for debugging data quality.**
+
+
+### 4. Batch Experiments (Benchmark)
+
+**To execute the pipeline across all normalization methods and models in a single run, use** **run_experiments.py**.
+
+**code**
+
+```
+python run_experiments.py --result_dir ./experiment_results
+```
+
+**This script will sequentially run experiments for:**
+
+* **Modes:** **Forest and Deep.**
+* **Normalizations:** **Z-Score, Min-Max, Percentile, Histogram Matching, and None.**
+
+**Results are organized hierarchically:** **./experiment_results/`<mode>`/`<normalization>`/`<timestamp>`/**
+
+**Optional Batch Flags:**
+
+* **--skip_forest**: Skip Random Forest experiments.
+* **--skip_deep**: Skip Deep Learning experiments.
 
 ## Command Line Arguments
 
@@ -92,6 +120,9 @@ python pipeline.py --prepro_only --result_dir ./debug_prepro
 * **pipeline.py**
 
   * **The main orchestrator. Handles argument parsing and selects the execution workflow (Forest vs. Deep).**
+* **run_experiments.py**
+
+  * **Automation script used to run the full suite of experiments (Forest/Deep + all Normalizations) in sequence. Handles error logging and result organization.**
 * **preprocessing.py**
 
   * **Contains Filter classes for image manipulation.**
@@ -110,18 +141,33 @@ python pipeline.py --prepro_only --result_dir ./debug_prepro
 
   * **Contains logic for cleaning up segmentation masks (e.g., Connected Components analysis).**
 
-
-
 ## Outputs
 
 **Results are saved in the specified** **--result_dir** **inside a timestamped folder.**
 
-* ***.mha**: Predicted segmentation masks (**_SEG.mha**) and post-processed masks (**_SEG-PP.mha**).
+* **.mha**: Predicted segmentation masks (**_SEG.mha***) and post-processed masks (**_SEG-PP.mha**).
 * **results.csv**: Detailed metrics for every subject.
 * **results_summary.csv**: Aggregated statistics (Mean/Std) across the dataset.
 * **learning_curve.png**: (Deep Learning only) A plot of Training vs. Validation loss.
 * **model.pth**: (Deep Learning only) The saved model weights.
 
+## Acknowledgments
+
+**This pipeline utilizes the following libraries:**
+
+* **SimpleITK** **for image IO and processing.**
+* **MONAI** **for Deep Learning architectures.**
+* **pymia** **for data handling and evaluation metrics.**
+
+## Outputs
+
+**Results are saved in the specified** **--result_dir** **inside a timestamped folder.**
+
+* ***.mha**: Predicted segmentation masks (_SEG.mha**) and post-processed masks (**_SEG-PP.mha**).
+* **results.csv**: Detailed metrics for every subject.
+* **results_summary.csv**: Aggregated statistics (Mean/Std) across the dataset.
+* **learning_curve.png**: (Deep Learning only) A plot of Training vs. Validation loss.
+* **model.pth**: (Deep Learning only) The saved model weights.
 
 ## Acknowledgments
 
