@@ -30,11 +30,11 @@ file_name = "results.csv"
 # choose trials to compare
 trials <- data.frame(
   PATH = c(
-    "../experiment_results/forest/z_score/2025-12-16-00-17-06",
-    "../experiment_results/forest/percentile/2025-12-16-00-30-28",
-    "../experiment_results/forest/none/2025-12-16-00-44-22",
-    "../experiment_results/forest/histogram_matching/2025-12-16-00-37-29",
-    "../experiment_results/forest/min_max/2025-12-16-00-23-44"
+    "../experiment_results/forest/z_score/2025-12-16-00-17-06_Final_0c8056a",
+    "../experiment_results/forest/percentile/2025-12-16-00-30-28_Final_0c8056a",
+    "../experiment_results/forest/none/2025-12-16-00-44-22_Final_0c8056a",
+    "../experiment_results/forest/histogram_matching/2025-12-16-00-37-29_Final_0c8056a",
+    "../experiment_results/forest/min_max/2025-12-16-00-23-44_Final_0c8056a"
   ),
   
   METHOD = c(
@@ -93,9 +93,12 @@ plot_dice <- ggplot(all_data, aes(x = LABEL, y = DICE, fill = METHOD)) +
   theme_minimal() +
   theme(
     plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-    axis.title = element_text(size = 12),
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
-    legend.position = "right",
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10, face = "bold"),
+    axis.text.y = element_text(size = 10, face = "bold"),
+    legend.position = "bottom",
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10 , face = "bold"),
     plot.background = element_rect(fill = "white", colour = "white")
   ) +
   coord_cartesian(ylim = c(0.3,1))
@@ -122,9 +125,12 @@ plot_hdrfdst <- ggplot(all_data, aes(x = LABEL, y = HDRFDST, fill = METHOD)) +
   theme_bw() +
   theme(
     plot.title = element_text(size = 16, face = "bold", hjust = 0.5),
-    axis.title = element_text(size = 12),
-    axis.text.x = element_text(angle = 45, hjust = 1, size = 10),
-    legend.position = "right",
+    axis.title = element_text(size = 12, face = "bold"),
+    axis.text.x = element_text(angle = 45, hjust = 1, size = 10, face = "bold"),
+    axis.text.y = element_text(size = 10, face = "bold"),
+    legend.position = "bottom",
+    legend.title = element_text(size = 10),
+    legend.text = element_text(size = 10 , face = "bold"),
     plot.background = element_rect(fill = "white", colour = "white")
   )
 
