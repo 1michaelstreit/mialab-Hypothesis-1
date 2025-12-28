@@ -14,12 +14,12 @@ All forest-related stuff stays in pipeline.py.
 import os
 import datetime
 import timeit
-import random  # Added for data splitting
+import random  
 
 import numpy as np
 import torch
 from torch.utils.data import Dataset, DataLoader
-import matplotlib.pyplot as plt  # Added for plotting
+import matplotlib.pyplot as plt  
 
 import SimpleITK as sitk
 
@@ -72,7 +72,6 @@ class BrainImageDataset(Dataset):
 
     def __getitem__(self, idx):
         id_, paths_original = self.patient_data[idx]
-        # work on a copy to avoid mutating crawler.data
         paths = dict(paths_original)
 
         # ----- 1) Load images -----

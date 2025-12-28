@@ -93,7 +93,7 @@ def run_all_experiments(
                 print("-" * 20)
                 print("Continuing to next experiment...")
 
-            # Optional: Clear GPU cache between deep learning runs to prevent Out-Of-Memory
+
             if mode == 'deep':
                 try:
                     import torch
